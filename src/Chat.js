@@ -1,0 +1,85 @@
+import React, { useEffect, useState } from 'react'
+import "./Chat.css"
+import ChatHeader from './ChatHeader'
+import AddCircleIcon from '@material-ui/icons/AddCircle';
+import CardGiftcardIcon from '@material-ui/icons/CardGiftcard';
+import GifIcon from '@material-ui/icons/Gif';
+import EmojiEmotionsIcon from '@material-ui/icons/EmojiEmotions';
+import Message from './Message';
+import { useSelector } from 'react-redux';
+import { selectUser } from './features/userSlice';
+import { selectChannelId, selectChannelName } from './features/appSlice';
+import axios from './axios'
+import Pusher from "pusher-js";
+
+const pusher = new Pusher('7d2b6c1fbc4cbcf6c3a5', {
+    cluster: 'ap2'
+});
+
+
+function Chat() {
+
+    const user = useSelector(selectUser)
+    const channelId = useSelector(selectChannelId)
+    const channelName = useSelector(selectChannelName);
+
+    const [input, setInput] = useState('')
+    const [messages, setMessages] = useState([]);
+
+    const getConversation = (channelId) => {
+        if (channelId) {
+            axios.get('/get/conversation?id=' + channelId)
+                .then((res) => {
+                    setMessages(res.data[0].conversation)
+                })
+        }
+    }
+
+    useEffect(() => {
+        getConversation(channelId);
+
+        const channel = pusher.subscribe('conversation');
+        channel.bind('newMessage', function (data) {
+            getConversation(channelId);
+        });
+
+    }, [channelId]);
+
+    const sendMessage = e => {
+        e.preventDefault();
+
+        axios.post('/new/message?id=' + channelId, {
+            message: input,
+            timestamp: Date.now(),
+            user: user
+        });
+
+        setInput('')
+    }
+
+    return (
+        <div className="chat">
+            <ChatHeader channelName={channelName} />
+
+            <div className="chat__messages">
+                {messages.map(message => (
+                    <Message timestamp={message.timestamp} message={message.message} user={message.user} />
+                ))}
+            </div>
+            <div className="chat__input">
+                <AddCircleIcon fontSize="large" />
+                <form>
+                    <input disabled={!channelId} value={input} onChange={e => setInput(e.target.value)} type="text" placeholder={'Message #' + channelName} />
+                    <button disabled={!channelId} type="submit" className="chat__inputButton" onClick={sendMessage}>Send Message</button>
+                </form>
+                <div className="chat__inputIcons">
+                    <CardGiftcardIcon fontSize="large" />
+                    <GifIcon fontSize="large" />
+                    <EmojiEmotionsIcon fontSize="large" />
+                </div>
+            </div>
+        </div>
+    )
+}
+
+export default Chat
